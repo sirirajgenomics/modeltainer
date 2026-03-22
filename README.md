@@ -27,20 +27,24 @@ ModelTainer delivers one‑command deployment for large language models on CPUs 
    ```
 2. Start example LLM backends so the gateway has targets to proxy. The commands below launch a GPU vLLM service and a CPU llama.cpp service:
    ```bash
-   # Download the GPT-OSS 20B model required by llama.cpp
-   mkdir -p models
-   huggingface-cli download ggml-org/gpt-oss-20b-GGUF --include "gpt-oss-20b-mxfp4.gguf" --local-dir models
-
-   # Start the backends
-   docker compose -f vllm/compose.yaml --profile cuda up -d vllm-cuda
-   docker compose -f llama.cpp/compose.yaml up -d llcpp
+   # To start backends, use the included profile scripts. 
+   # These profiles define how to run the official Docker images (vllm, sglang, llamacpp).
+   # The scripts will automatically cache downloaded models locally.
+   
+   # Start a GPU vLLM service
+   bash scripts/run_profile.sh profiles/example-vllm.sh
+   
+   # Start a CPU llama.cpp service
+   bash scripts/run_profile.sh profiles/example-llamacpp.sh
+   
+   # Note: An example SGLang profile is also available in profiles/example-sglang.sh
    ```
-   The services expose `http://vllm:8000` and `http://llcpp:8002`, matching the defaults in `config/models.yaml`.
-3. Launch the gateway and supporting services:
+   The scripts will spin up Docker containers natively and expose `http://localhost:8000` for vLLM and `http://localhost:8002` for llama.cpp by default, matching `config/models.yaml`.
+3. Launch the API gateway:
    ```bash
-   make up
+   docker compose up -d gateway
    ```
-   The `make` command prints the configured model backends before composing the Docker services.
+   The gateway configures endpoints before composing the services.
 4. Verify the stack with a chat completion request:
    ```bash
    curl -N -X POST http://localhost:8080/v1/chat/completions \
