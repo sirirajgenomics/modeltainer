@@ -1,4 +1,0 @@
-models:
-  gpt-oss-20b-it:
-    backend: vllm
-    backend_url: http://vllm-cuda:8000

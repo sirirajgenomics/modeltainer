@@ -1,4 +1,0 @@
-models:
-  gpt-oss-20b:
-    backend: llamacpp
-    backend_url: http://llcpp:8002

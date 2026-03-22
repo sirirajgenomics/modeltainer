@@ -1,69 +1,93 @@
-# ModelTainer
+# 🚀 ModelTainer
 
-ModelTainer delivers one‑command deployment for large language models on CPUs or GPUs. It exposes an OpenAI‑compatible API that can serve vLLM and llama.cpp models side‑by‑side, allowing you to hot‑swap models and compare results with minimal effort.
+<p align="center">
+  <em>A unified, high-performance API Gateway for Large Language Models.</em>
+</p>
 
-## Features
+**ModelTainer** is an enterprise-ready, declarative deployment system that orchestrates state-of-the-art LLM inference engines—including **vLLM**, **SGLang**, and **llama.cpp**—behind a single **OpenAI-compatible API endpoint**. 
 
-- **Unified API** – Interact with GPU (vLLM) and CPU/ARM (llama.cpp) models through the same endpoint.
-- **Hot‑swappable models** – Change models via configuration or by switching Docker/Apptainer containers; no rebuilds required.
-- **Portable** – Runs on a laptop or scales out to multi‑node clusters using Docker Compose.
-- **Streaming responses** – Tokens stream as they are generated.
-- **Apptainer support** – Package models into transferable Apptainer images.
-- **NVIDIA Docker support** – Build GPU-enabled images with a user-defined
-  NVIDIA Docker base version.
+By leveraging official Docker images and a flexible profile-based runner, ModelTainer eliminates the friction of managing complex container builds, manual weight caching, and multi-engine routing. You can hot-swap models, perform A/B testing on different engines, and serve GPU and CPU models side-by-side with minimal effort.
 
-## Prerequisites
+---
 
-- [Docker](https://docs.docker.com/get-docker/) Engine \>= 24 with Compose V2
-- Git
-- (Optional) [Hugging Face token](https://huggingface.co/settings/tokens) for gated models
+## ✨ Key Capabilities
 
-## Quickstart
+- **Unified OpenAI-Compatible Gateway**: Interact with multiple disparate models (running on diverse hardware) through one seamless `/v1/chat/completions` REST endpoint.
+- **Engine Agnostic**: Natively supports [vLLM](https://github.com/vllm-project/vllm), [SGLang](https://github.com/sgl-project/sglang), and [llama.cpp](https://github.com/ggerganov/llama.cpp) utilizing their official, highly optimized Docker distributions.
+- **Declarative Custom Profiles**: Spin up models dynamically using transparent `.sh` profiles rather than wrestling with monolithic Docker Compose files or manual build contexts. 
+- **Zero-Copy Host Caching**: Model weights are seamlessly cached to your host machine (default: `~/.cache/modeltainer`), entirely bypassing redundant downloads and saving critical SSD space.
+- **Seamless Scalability**: Runs efficiently on a single laptop edge-node or scales elegantly into multi-GPU server environments.
 
-1. Clone the repository and enter it:
-   ```bash
-   git clone https://github.com/sirirajgenomics/modeltainer
-   cd modeltainer
-   ```
-2. Start example LLM backends so the gateway has targets to proxy. The commands below launch a GPU vLLM service and a CPU llama.cpp service:
-   ```bash
-   # To start backends, use the included profile scripts. 
-   # These profiles define how to run the official Docker images (vllm, sglang, llamacpp).
-   # The scripts will automatically cache downloaded models locally.
-   
-   # Start a GPU vLLM service
-   bash scripts/run_profile.sh profiles/example-vllm.sh
-   
-   # Start a CPU llama.cpp service
-   bash scripts/run_profile.sh profiles/example-llamacpp.sh
-   
-   # Note: An example SGLang profile is also available in profiles/example-sglang.sh
-   ```
-   The scripts will spin up Docker containers natively and expose `http://localhost:8000` for vLLM and `http://localhost:8002` for llama.cpp by default, matching `config/models.yaml`.
-3. Launch the API gateway:
-   ```bash
-   docker compose up -d gateway
-   ```
-   The gateway configures endpoints before composing the services.
-4. Verify the stack with a chat completion request:
-   ```bash
-   curl -N -X POST http://localhost:8080/v1/chat/completions \
-     -H 'Content-Type: application/json' \
-     -d '{"model": "gpt-oss-20b-it", "messages": [{"role": "user", "content": "Hello"}]}'
-   ```
-   A streaming response confirms everything is running.
+## 🛠️ Prerequisites
 
-### Configuration and Cleanup
+- [Docker Engine](https://docs.docker.com/get-docker/) (v24+ recommended) with Compose V2.
+- NVIDIA Container Toolkit (if utilizing GPUs).
+- Git.
+- *(Optional)* [Hugging Face token](https://huggingface.co/settings/tokens) exported for gated models.
 
-- Ensure your LLM containers serve the models referenced in `config/models.yaml`.
-- The `make up` command prints the configured models so you can verify endpoints before startup.
-- Stop the gateway with `make down` and remove backend containers with `docker compose -f <file> down`.
+## ⚡ Quickstart
 
-## Documentation
+### 1. Clone & Enter Repository
+```bash
+git clone https://github.com/sirirajgenomics/modeltainer
+cd modeltainer
+```
 
-See the [documentation index](docs/README.md) for guides on quickstart, security, model swapping, troubleshooting, and more.
+### 2. Launch LLM Backends (Custom Profiles)
+ModelTainer uses **Custom Profiles** located in the `profiles/` directory. These profiles abstract the complexity of launching isolated engines.
 
-## License
+Let's spin up a GPU-accelerated **vLLM** backend and a CPU-bound **llama.cpp** backend:
 
-ModelTainer is licensed under the [Apache 2.0 License](LICENSE).
+```bash
+# Start a GPU-accelerated instance via vLLM
+bash scripts/run_profile.sh profiles/example-vllm.sh
 
+# Start a CPU instance via llama.cpp
+bash scripts/run_profile.sh profiles/example-llamacpp.sh
+```
+
+*(Note: We also include a high-throughput SGLang profile in `profiles/example-sglang.sh`!)*
+
+### 3. Start the API Gateway
+The gateway proxies requests to your newly spun up backends. Its routes are defined dynamically via `config/models.yaml`.
+
+```bash
+docker compose up -d gateway
+```
+
+### 4. Verify Inference 
+Send a standard chat completion request to your unified endpoint:
+
+```bash
+curl -N -X POST http://localhost:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "gpt-oss-20b-it", 
+    "messages": [{"role": "user", "content": "Explain the architecture of a transformer model."}]
+  }'
+```
+You will receive a blazing-fast, streaming token response!
+
+---
+
+## ⚙️ Creating Custom Profiles
+
+Creating your own model deployment is extremely straightforward. Create a new file in `profiles/my-model.sh`:
+
+```bash
+#!/usr/bin/env bash
+
+ENGINE="sglang"               # vllm, sglang, or llamacpp
+MODEL="Qwen/Qwen2.5-7B"       # Hugging Face Repo ID
+PORT="8000"                   # Port to expose
+SGLANG_ARGS="--trust-remote-code" # Engine specific arguments
+```
+
+Execute it instantly via: `bash scripts/run_profile.sh profiles/my-model.sh`.
+
+## 📚 Documentation
+- See the `docs/` folder for deeper guides on security, model routing, and complex deployment topologies.
+- For AI Agents and Contributors, please read our [AGENT.md](AGENT.md) for architectural guidelines.
+
+## ⚖️ License
+ModelTainer is open-source software licensed under the [Apache 2.0 License](LICENSE).
