@@ -28,4 +28,7 @@ When a user requests a new backend engine (e.g., `TensorRT-LLM`, `Ollama`, or `v
 2. **Modify `scripts/run_profile.sh`**: Add a new `case "$ENGINE" in` block mapping the volume mounts and port forwarding appropriately.
 3. **Create an Example Profile**: Add an `example-<engine>.sh` to the `profiles/` directory demonstrating basic use.
 
+## 4. Agentic Workflows
+- **Always Verify Model Instructions**: Before creating a running job or profile for a new model, you MUST always fetch and read the target model's Hugging Face `README.md` (Model Card). This ensures that you account for specific quantization details, prompt templates, context window constraints, or custom code requirements (`--trust-remote-code`) before attempting to start the engine.
+
 By maintaining this structure, we ensure ModelTainer remains agile, performant, and incredibly easy for end-users to adopt.
