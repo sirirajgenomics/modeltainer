@@ -114,7 +114,7 @@ class ModelParams(BaseModel):
     n_gpu_layers: Optional[int] = Field(
         default=None,
         description="Number of model layers to offload to GPU. Maps to --n-gpu-layers (-ngl) in llama.cpp.",
-        ge=0,
+        ge=-1,
     )
 
     # Misc

@@ -13,15 +13,18 @@ Bring up ModelTainer and serve an LLM behind an OpenAI-compatible API in minutes
    git clone https://github.com/sirirajgenomics/modeltainer.git
    cd modeltainer
    ```
-2. Start example backends so the gateway has models to proxy. These commands launch vLLM on a GPU and llama.cpp on the CPU:
-   ```bash
-   mkdir -p models
-   # XS — llama.cpp (GGUF) on CPU
-   huggingface-cli download bartowski/LFM2.5-1.2B-Thinking-GGUF --include "LFM2.5-1.2B-Thinking-Q4_K_M.gguf" --local-dir models
+2. Start example backends so the gateway has models to proxy. Run these in separate terminal tabs, or run them in the background.
 
-   docker compose -f vllm/compose.yaml --profile cuda up -d vllm-cuda
-   docker compose -f llama.cpp/compose.yaml up -d llcpp
+   **XS Tier (llama.cpp on CPU):**
+   ```bash
+   bash scripts/run_profile.sh profiles/example-llamacpp-cpu.yaml
    ```
+
+   **M Tier (vLLM on GPU):**
+   ```bash
+   bash scripts/run_profile.sh profiles/example-vllm-gpu.yaml
+   ```
+
 3. Bring up the gateway:
    ```bash
    make up
@@ -50,9 +53,9 @@ Bring up ModelTainer and serve an LLM behind an OpenAI-compatible API in minutes
    ```
    A streaming response confirms the stack is running.
 
-For advanced options such as model selection or running multiple containers, see the [model swap guide](model-swap.md) and [A/B testing](ab-testing.md).
+For advanced options such as model tuning or custom hardware configurations, see the [Profile Reference](profile-reference.md).
 
 ## Notes
-- The first run downloads models into `./data/hf`, which can take several minutes.
-- Run `make down` to stop all services.
-- Default ports are 8080 for the gateway and 8000 for vLLM; adjust via environment variables if needed.
+- The first run downloads models into `~/.cache/modeltainer` (or `~/.cache/modeltainer_llamacpp`), which can take several minutes.
+- Run `make down` to stop the gateway. To stop a backend container, use `docker stop modeltainer-<engine>-<port>`.
+- Default ports are 8080 for the gateway, and backends run on 8000 (XS), 8010 (S), 8020 (M), 8021 (M-alt), and 8030 (L).

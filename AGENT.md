@@ -34,6 +34,14 @@ bash scripts/run_profile.sh --dry-run profiles/my-model.yaml
 bash scripts/run_profile.sh profiles/my-model.yaml
 ```
 
+### Official Model Tiers
+Always maintain these 4 tiers in `config/models.yaml` and testing:
+- **XS (Extra Small):** Port `8000`. Target: CPU/llama.cpp (e.g. LFM 1.2B).
+- **S (Small):** Port `8010`. Target: Single GPU/vLLM (e.g. Gemma 4B).
+- **M (Medium):** Port `8020`. Target: Standard GPU/vLLM (e.g. OSS 20B).
+  - *M-alt:* Port `8021`. Target: SGLang variant.
+- **L (Large):** Port `8030`. Target: DGX Spark/vLLM (e.g. OSS 120B).
+
 ---
 
 ## 3. Coding Standards

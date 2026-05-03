@@ -167,8 +167,6 @@ See [docs/profile-reference.md](docs/profile-reference.md) for the full referenc
 | [Profile Reference](docs/profile-reference.md) | Every profile field documented |
 | [DGX Spark Guide](docs/dgx-spark.md) | Blackwell-specific setup and tips |
 | [vLLM Runbook](docs/vllm-runbook.md) | vLLM GPU backend details |
-| [Multi-GPU](docs/vllm-multi-gpu.md) | Tensor/pipeline parallelism |
-| [A/B Testing](docs/ab-testing.md) | Running multiple models side-by-side |
 | [Security](docs/security.md) | Auth, TLS, container hardening |
 | [Resource Sizing](docs/resource-sizing.md) | VRAM/RAM estimates |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues |
