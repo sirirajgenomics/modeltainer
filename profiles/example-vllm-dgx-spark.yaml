@@ -1,15 +1,16 @@
 # =============================================================================
-# ModelTainer Profile — vLLM on NVIDIA DGX Spark
+# ModelTainer Profile — L tier: OpenAI OSS 120B on NVIDIA DGX Spark (vLLM)
 # =============================================================================
-# NVIDIA DGX Spark: GB10 Grace Blackwell — ARM aarch64 + 128 GB unified memory.
-# Key differences from a standard GPU node:
+# Model tier : L (Large)
+# Model      : openai/gpt-oss-120b
+# Hardware   : NVIDIA DGX Spark (GB10 Grace Blackwell — ARM aarch64, 128 GB unified memory)
+# Port       : 8030
+#
+# Key DGX Spark differences vs standard GPU:
 #   • --enforce-eager is injected automatically (avoids CUDA graph issues on
 #     Grace Blackwell in early driver versions)
 #   • gpu_memory_utilization can be set higher (unified memory, no separate VRAM)
-#   • Use dtype: auto — Blackwell hardware handles bfloat16 natively
-#
-# Recommended engines: vLLM (primary), SGLang.
-# llama.cpp is not needed on DGX Spark — unified memory makes it redundant.
+#   • Use dtype: auto — Blackwell handles bfloat16 natively
 #
 # Launch:  bash scripts/run_profile.sh profiles/example-vllm-dgx-spark.yaml
 # Dry-run: bash scripts/run_profile.sh --dry-run profiles/example-vllm-dgx-spark.yaml
@@ -17,21 +18,13 @@
 
 engine: vllm
 hardware: dgx_spark       # ← Selects DGX Spark image + injects --enforce-eager
-model: Qwen/Qwen2.5-7B-Instruct
-port: 8000
+model: openai/gpt-oss-120b
+port: 8030                # L tier port
 
 model_params:
-  # DGX Spark has 128 GB unified memory — longer context is feasible
   max_model_len: 32768
-  # Use most of unified memory for KV cache
   gpu_memory_utilization: 0.92
-  dtype: auto              # Blackwell handles bfloat16 natively
-  trust_remote_code: true
+  dtype: auto
+  tensor_parallel_size: 2  # 120B requires tensor parallelism across both Blackwell dies
 
-# Optional: pass additional vLLM flags not yet in model_params
 engine_args: []
-  # Example: enable speculative decoding
-  # - "--speculative-model"
-  # - "Qwen/Qwen2.5-0.5B-Instruct"
-  # - "--num-speculative-tokens"
-  # - "5"

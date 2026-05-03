@@ -1,0 +1,24 @@
+# =============================================================================
+# ModelTainer Profile — S tier: Google Gemma 4 E4B Instruct on GPU (vLLM)
+# =============================================================================
+# Model tier : S (Small)
+# Model      : google/gemma-4-E4B-it
+# Hardware   : GPU (NVIDIA)
+# Port       : 8010
+#
+# Launch:  bash scripts/run_profile.sh profiles/example-vllm-gpu-small.yaml
+# Dry-run: bash scripts/run_profile.sh --dry-run profiles/example-vllm-gpu-small.yaml
+# =============================================================================
+
+engine: vllm
+hardware: gpu
+model: google/gemma-4-E4B-it
+port: 8010                # S tier port
+
+model_params:
+  max_model_len: 8192
+  gpu_memory_utilization: 0.90
+  dtype: bfloat16
+  trust_remote_code: true
+
+engine_args: []

@@ -1,19 +1,47 @@
 models:
-  # GPU inference via vLLM — connects to a backend started via:
-  #   bash scripts/run_profile.sh profiles/example-vllm-gpu.yaml
-  gpt-oss-20b-it:
-    backend: vllm
+  # ---------------------------------------------------------------------------
+  # XS (Extra Small) — LiquidAI LFM2.5-1.2B-Thinking (CPU / low-VRAM)
+  # Model:   LiquidAI/LFM2.5-1.2B-Thinking
+  # Backend: llama.cpp (GGUF)
+  #   bash scripts/run_profile.sh profiles/example-llamacpp-cpu.yaml
+  # ---------------------------------------------------------------------------
+  lfm2-5-1b:
+    backend: llamacpp
     backend_url: "http://host.docker.internal:8000"
+    embeddings: true
 
-  # High-throughput via SGLang — connects to a backend started via:
+  # ---------------------------------------------------------------------------
+  # S (Small) — Google Gemma 4 E4B Instruct (single GPU / low VRAM)
+  # Model:   google/gemma-4-E4B-it
+  # Backend: vLLM
+  #   bash scripts/run_profile.sh profiles/example-vllm-gpu-small.yaml
+  # ---------------------------------------------------------------------------
+  gemma-4-e4b:
+    backend: vllm
+    backend_url: "http://host.docker.internal:8010"
+
+  # ---------------------------------------------------------------------------
+  # M (Medium) — OpenAI OSS 20B (GPU — vLLM primary)
+  # Model:   openai/gpt-oss-20b
+  # Backend: vLLM
+  #   bash scripts/run_profile.sh profiles/example-vllm-gpu.yaml
+  # ---------------------------------------------------------------------------
+  gpt-oss-20b:
+    backend: vllm
+    backend_url: "http://host.docker.internal:8020"
+
+  # M-alt — SGLang high-throughput variant (same model, different engine):
   #   bash scripts/run_profile.sh profiles/example-sglang-gpu.yaml
   gpt-oss-20b-sglang:
     backend: sglang
-    backend_url: "http://host.docker.internal:8001"
+    backend_url: "http://host.docker.internal:8021"
 
-  # CPU inference via llama.cpp — connects to a backend started via:
-  #   bash scripts/run_profile.sh profiles/example-llamacpp-cpu.yaml
-  gpt-oss-20b:
-    backend: llamacpp
-    backend_url: "http://host.docker.internal:8002"
-    embeddings: true
+  # ---------------------------------------------------------------------------
+  # L (Large) — OpenAI OSS 120B (multi-GPU / DGX Spark)
+  # Model:   openai/gpt-oss-120b
+  # Backend: vLLM
+  #   bash scripts/run_profile.sh profiles/example-vllm-dgx-spark.yaml
+  # ---------------------------------------------------------------------------
+  gpt-oss-120b:
+    backend: vllm
+    backend_url: "http://host.docker.internal:8030"

@@ -1,8 +1,10 @@
 # =============================================================================
-# ModelTainer Profile — llama.cpp with Partial GPU Offload
+# ModelTainer Profile — XS tier: LiquidAI LFM2.5-1.2B-Thinking with GPU offload
 # =============================================================================
-# llama.cpp can offload a subset of model layers to the GPU while keeping
-# the remainder in system RAM. Useful for machines with limited VRAM.
+# Model tier : XS (Extra Small) — partial GPU offload variant
+# Model      : LiquidAI/LFM2.5-1.2B-Thinking  (GGUF via llama.cpp)
+# Hardware   : GPU — layers offloaded to VRAM via -ngl
+# Port       : 8000
 #
 # Launch:  bash scripts/run_profile.sh profiles/example-llamacpp-gpu.yaml
 # Dry-run: bash scripts/run_profile.sh --dry-run profiles/example-llamacpp-gpu.yaml
@@ -10,15 +12,15 @@
 
 engine: llamacpp
 hardware: gpu
-model: unsloth/Qwen2.5-0.5B-Instruct-GGUF
-model_file: qwen2.5-0.5b-instruct-q4_k_m.gguf
-port: 8003
+model: bartowski/LFM2.5-1.2B-Thinking-GGUF
+model_file: LFM2.5-1.2B-Thinking-Q4_K_M.gguf
+port: 8000                # XS tier port
 
 model_params:
-  max_model_len: 4096
-  # Offload this many layers to GPU VRAM (0 = CPU only, -1 = all layers)
-  n_gpu_layers: 20
+  max_model_len: 8192
+  # Offload all layers to GPU VRAM (-1 = all, 0 = CPU only, N = N layers)
+  n_gpu_layers: -1
   n_threads: 4
-  n_parallel: 2
+  n_parallel: 4
 
 engine_args: []

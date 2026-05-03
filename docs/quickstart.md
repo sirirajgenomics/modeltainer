@@ -16,7 +16,8 @@ Bring up ModelTainer and serve an LLM behind an OpenAI-compatible API in minutes
 2. Start example backends so the gateway has models to proxy. These commands launch vLLM on a GPU and llama.cpp on the CPU:
    ```bash
    mkdir -p models
-   huggingface-cli download ggml-org/gpt-oss-20b-GGUF --include "gpt-oss-20b-mxfp4.gguf" --local-dir models
+   # XS — llama.cpp (GGUF) on CPU
+   huggingface-cli download bartowski/LFM2.5-1.2B-Thinking-GGUF --include "LFM2.5-1.2B-Thinking-Q4_K_M.gguf" --local-dir models
 
    docker compose -f vllm/compose.yaml --profile cuda up -d vllm-cuda
    docker compose -f llama.cpp/compose.yaml up -d llcpp
@@ -25,11 +26,27 @@ Bring up ModelTainer and serve an LLM behind an OpenAI-compatible API in minutes
    ```bash
    make up
    ```
-4. Verify the gateway is serving requests:
+4. Verify each tier:
    ```bash
-   curl -N -X POST http://localhost:8080/v1/chat/completions \
+   # XS — LFM2.5-1.2B-Thinking
+   curl -s -X POST http://localhost:8080/v1/chat/completions \
      -H 'Content-Type: application/json' \
-     -d '{"model": "gpt-oss-20b-it", "messages": [{"role": "user", "content": "Hello"}]}'
+     -d '{"model": "lfm2-5-1b", "messages": [{"role": "user", "content": "Hello"}]}'
+
+   # S — Gemma 4 E4B
+   curl -s -X POST http://localhost:8080/v1/chat/completions \
+     -H 'Content-Type: application/json' \
+     -d '{"model": "gemma-4-e4b", "messages": [{"role": "user", "content": "Hello"}]}'
+
+   # M — gpt-oss-20b
+   curl -s -X POST http://localhost:8080/v1/chat/completions \
+     -H 'Content-Type: application/json' \
+     -d '{"model": "gpt-oss-20b", "messages": [{"role": "user", "content": "Hello"}]}'
+
+   # L — gpt-oss-120b
+   curl -s -X POST http://localhost:8080/v1/chat/completions \
+     -H 'Content-Type: application/json' \
+     -d '{"model": "gpt-oss-120b", "messages": [{"role": "user", "content": "Hello"}]}'
    ```
    A streaming response confirms the stack is running.
 

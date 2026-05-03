@@ -1,8 +1,14 @@
 # =============================================================================
-# ModelTainer Profile — SGLang on GPU
+# ModelTainer Profile — M-alt tier: OpenAI OSS 20B via SGLang on GPU
 # =============================================================================
+# Model tier : M-alt (Medium — high-throughput variant via SGLang)
+# Model      : openai/gpt-oss-20b
+# Hardware   : GPU (NVIDIA)
+# Port       : 8021
+#
 # SGLang is optimised for high throughput and structured generation.
-# Uses --gpus all automatically.
+# Run this alongside example-vllm-gpu.yaml to serve the same model through
+# two engines and A/B test throughput.
 #
 # Launch:  bash scripts/run_profile.sh profiles/example-sglang-gpu.yaml
 # Dry-run: bash scripts/run_profile.sh --dry-run profiles/example-sglang-gpu.yaml
@@ -10,12 +16,12 @@
 
 engine: sglang
 hardware: gpu
-model: Qwen/Qwen2.5-0.5B-Instruct
-port: 8001
+model: openai/gpt-oss-20b
+port: 8021                # M-alt tier port
 
 model_params:
   max_model_len: 4096
   gpu_memory_utilization: 0.90
-  trust_remote_code: true    # Required for some Qwen variants
+  trust_remote_code: true
 
 engine_args: []

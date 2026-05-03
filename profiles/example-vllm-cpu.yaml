@@ -1,22 +1,23 @@
 # =============================================================================
-# ModelTainer Profile — vLLM on CPU Only
+# ModelTainer Profile — M tier: OpenAI OSS 20B on CPU-only (vLLM)
 # =============================================================================
-# Runs vLLM in CPU-only mode (no GPU required).
-# The vllm/vllm-openai:latest-cpu image handles CPU inference.
-# Best for: development, integration testing, small models on commodity hardware.
+# Model tier : M (Medium) — CPU-only dev/test variant
+# Model      : openai/gpt-oss-20b
+# Hardware   : CPU-only (no GPU required)
+# Port       : 8020
 #
 # Launch:  bash scripts/run_profile.sh profiles/example-vllm-cpu.yaml
 # Dry-run: bash scripts/run_profile.sh --dry-run profiles/example-vllm-cpu.yaml
 # =============================================================================
 
 engine: vllm
-hardware: cpu          # ← No GPU flags will be added
-model: Qwen/Qwen2.5-0.5B-Instruct
-port: 8000
+hardware: cpu             # ← No GPU flags will be added
+model: openai/gpt-oss-20b
+port: 8020                # M tier port
 
 model_params:
   # Keep context short on CPU to limit memory pressure
   max_model_len: 2048
-  dtype: float32       # CPU inference typically requires float32
+  dtype: float32          # CPU inference typically requires float32
 
 engine_args: []

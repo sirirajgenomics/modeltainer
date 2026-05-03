@@ -1,21 +1,26 @@
 #!/usr/bin/env bash
 
-# Example Custom Profile for vLLM
-# You can customize these variables to run different models.
+# Example Custom Profile for vLLM — M tier (primary) or S tier
+# Set MODEL and PORT to match the tier you want to run.
 
 # The engine to use (vllm, sglang, llamacpp)
 ENGINE="vllm"
 
-# The Hugging Face model repository
-MODEL="Qwen/Qwen2.5-0.5B-Instruct"
+# ---------------------------------------------------------------------------
+# Choose a tier:
+#   S  (Small)  — google/gemma-4-E4B-it         PORT=8010
+#   M  (Medium) — openai/gpt-oss-20b             PORT=8020
+#   L  (Large)  — openai/gpt-oss-120b            PORT=8030
+# ---------------------------------------------------------------------------
 
-# The port to expose on the host
-PORT="8000"
+# M tier default
+MODEL="openai/gpt-oss-20b"
 
-# Any extra arguments to pass to the engine
-# e.g., limiting max completion length or selecting specific quantizations
-VLLM_ARGS="--max-model-len 4096"
+# M tier port
+PORT="8020"
+
+# Any extra arguments to pass to vLLM
+VLLM_ARGS="--max-model-len 4096 --gpu-memory-utilization 0.90 --dtype auto"
 
 # Where to cache models on the host machine.
-# By default, this uses ~/.cache/modeltainer if not specified.
 export HOST_CACHE_DIR="$HOME/.cache/modeltainer"

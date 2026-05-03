@@ -1,20 +1,24 @@
 # =============================================================================
-# ModelTainer Profile — SGLang on NVIDIA DGX Spark
+# ModelTainer Profile — L tier: OpenAI OSS 120B via SGLang on DGX Spark
 # =============================================================================
-# SGLang on DGX Spark for high-throughput structured generation workloads.
+# Model tier : L (Large) — high-throughput SGLang variant
+# Model      : openai/gpt-oss-120b
+# Hardware   : NVIDIA DGX Spark
+# Port       : 8030
 #
 # Launch:  bash scripts/run_profile.sh profiles/example-sglang-dgx-spark.yaml
 # =============================================================================
 
 engine: sglang
 hardware: dgx_spark
-model: Qwen/Qwen2.5-7B-Instruct
-port: 8001
+model: openai/gpt-oss-120b
+port: 8030                # L tier port
 
 model_params:
   max_model_len: 32768
   gpu_memory_utilization: 0.92
   dtype: auto
   trust_remote_code: true
+  tensor_parallel_size: 2
 
 engine_args: []

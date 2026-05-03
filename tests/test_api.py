@@ -23,8 +23,10 @@ def test_health():
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "ok"
-    assert "gpt-oss-20b-it" in body["models"]
-    assert "gpt-oss-20b" in body["models"]
+    assert "lfm2-5-1b" in body["models"]       # XS  :8000 (llamacpp)
+    assert "gemma-4-e4b" in body["models"]     # S   :8010 (vllm)
+    assert "gpt-oss-20b" in body["models"]     # M   :8020 (vllm)
+    assert "gpt-oss-120b" in body["models"]    # L   :8030 (vllm)
 
 
 def test_models_endpoint():
@@ -33,7 +35,7 @@ def test_models_endpoint():
     assert resp.status_code == 200
     body = resp.json()
     ids = [m["id"] for m in body["data"]]
-    assert "gpt-oss-20b-it" in ids and "gpt-oss-20b" in ids
+    assert "lfm2-5-1b" in ids and "gemma-4-e4b" in ids and "gpt-oss-20b" in ids and "gpt-oss-120b" in ids
 
 
 def test_auth_required():
@@ -63,7 +65,7 @@ def test_authorization_header_not_forwarded():
     async_client = httpx.AsyncClient(transport=transport)
     app.state.client = async_client
 
-    payload = {"model": "gpt-oss-20b-it", "messages": [{"role": "user", "content": "hi"}]}
+    payload = {"model": "gpt-oss-20b", "messages": [{"role": "user", "content": "hi"}]}
     resp = client.post("/v1/chat/completions", json=payload, headers={"Authorization": "Bearer test"})
     assert resp.status_code == 200
     asyncio.run(async_client.aclose())
@@ -88,7 +90,7 @@ def test_streaming_proxy():
     app.state.client = async_client
 
     payload = {
-        "model": "gpt-oss-20b-it",
+        "model": "gpt-oss-20b",
         "messages": [{"role": "user", "content": "hi"}],
         "stream": True,
     }
@@ -104,9 +106,10 @@ def test_concurrent_models():
     load_config()
 
     async def handler(request):
-        if "8000" in str(request.url):
+        url = str(request.url)
+        if "8020" in url:   # M tier — vLLM
             return httpx.Response(200, json={"model": "vllm"})
-        if "8002" in str(request.url):
+        if "8000" in url:   # XS tier — llamacpp
             return httpx.Response(200, json={"model": "llcpp"})
         return httpx.Response(500)
 
@@ -114,8 +117,8 @@ def test_concurrent_models():
     async_client = httpx.AsyncClient(transport=transport)
     app.state.client = async_client
 
-    payload_a = {"model": "gpt-oss-20b-it", "messages": [{"role": "user", "content": "hi"}]}
-    payload_b = {"model": "gpt-oss-20b", "messages": [{"role": "user", "content": "hi"}]}
+    payload_a = {"model": "gpt-oss-20b", "messages": [{"role": "user", "content": "hi"}]}
+    payload_b = {"model": "lfm2-5-1b", "messages": [{"role": "user", "content": "hi"}]}
 
     async def run():
         transport = httpx.ASGITransport(app=app)
