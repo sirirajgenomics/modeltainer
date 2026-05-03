@@ -1,0 +1,27 @@
+# =============================================================================
+# ModelTainer Profile — vLLM on GPU
+# =============================================================================
+# Standard GPU machine (NVIDIA/AMD). Uses --gpus all automatically.
+#
+# Launch:  bash scripts/run_profile.sh profiles/example-vllm-gpu.yaml
+# Dry-run: bash scripts/run_profile.sh --dry-run profiles/example-vllm-gpu.yaml
+# =============================================================================
+
+engine: vllm
+hardware: gpu
+model: Qwen/Qwen2.5-0.5B-Instruct
+port: 8000
+
+model_params:
+  # Maximum context window length
+  max_model_len: 4096
+  # Fraction of GPU VRAM allocated to the KV cache (0.0–1.0)
+  gpu_memory_utilization: 0.90
+  # Model weights precision (auto lets vLLM decide based on model config)
+  dtype: auto
+
+# Raw engine arguments appended verbatim after all structured flags.
+# Use for flags not yet in model_params, e.g.:
+#   engine_args:
+#     - "--enable-prefix-caching"
+engine_args: []

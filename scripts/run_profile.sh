@@ -1,109 +1,191 @@
 #!/usr/bin/env bash
 
-# Run an official Docker container based on a custom model profile
-# Usage: ./scripts/run_profile.sh profiles/my-profile.sh
+# =============================================================================
+# ModelTainer — run_profile.sh
+# =============================================================================
+# Launch an official Docker inference engine from a declarative YAML profile.
+#
+# Usage:
+#   bash scripts/run_profile.sh <profile.yaml>         # run
+#   bash scripts/run_profile.sh --dry-run <profile.yaml>  # print docker command, don't run
+#
+# Profile format: see profiles/example-*.yaml and docs/profile-reference.md
+# =============================================================================
 
 set -euo pipefail
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+log()  { echo "[modeltainer] $*"; }
+err()  { echo "[modeltainer] ERROR: $*" >&2; }
+die()  { err "$@"; exit 1; }
+
 usage() {
-  echo "Usage: $0 <profile_script>"
-  echo "Example: $0 profiles/example-vllm.sh"
+  cat <<EOF
+Usage: $0 [--dry-run] <profile.yaml>
+
+  <profile.yaml>   Path to a ModelTainer YAML profile manifest.
+  --dry-run        Print the resolved docker run command without executing it.
+
+Examples:
+  bash scripts/run_profile.sh profiles/example-vllm-gpu.yaml
+  bash scripts/run_profile.sh --dry-run profiles/example-llamacpp-cpu.yaml
+EOF
   exit 1
 }
 
-if [ "$#" -ne 1 ]; then
-  usage
-fi
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
+DRY_RUN=false
+PROFILE_SCRIPT=""
 
-PROFILE_SCRIPT="$1"
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=true ;;
+    --help|-h) usage ;;
+    -*) die "Unknown flag: $arg" ;;
+    *)
+      if [ -n "$PROFILE_SCRIPT" ]; then
+        die "Only one profile can be specified at a time."
+      fi
+      PROFILE_SCRIPT="$arg"
+      ;;
+  esac
+done
 
-if [ ! -f "$PROFILE_SCRIPT" ]; then
-  echo "Error: Profile script '$PROFILE_SCRIPT' not found."
-  exit 1
-fi
+[ -z "$PROFILE_SCRIPT" ] && usage
+[ ! -f "$PROFILE_SCRIPT" ] && die "Profile not found: '$PROFILE_SCRIPT'"
 
-echo "Loading profile: $PROFILE_SCRIPT"
-source "$PROFILE_SCRIPT"
+# ---------------------------------------------------------------------------
+# Locate Python — prefer venv/system python3
+# ---------------------------------------------------------------------------
+PYTHON="${MODELTAINER_PYTHON:-$(command -v python3 2>/dev/null || command -v python || echo "")}"
+[ -z "$PYTHON" ] && die "Python 3 is required but was not found. Install Python 3 or set MODELTAINER_PYTHON."
+"$PYTHON" -c "import yaml, pydantic" 2>/dev/null \
+  || die "Python dependencies missing. Run: pip install pyyaml pydantic"
 
-# Validate required variables
-if [ -z "${ENGINE:-}" ] || [ -z "${MODEL:-}" ] || [ -z "${PORT:-}" ]; then
-  echo "Error: Profile must define ENGINE, MODEL, and PORT."
-  exit 1
-fi
+# ---------------------------------------------------------------------------
+# Validate and resolve the profile to a JSON spec
+# ---------------------------------------------------------------------------
+SCHEMA_PY="$(dirname "$(realpath "$0")")/profile_schema.py"
+[ ! -f "$SCHEMA_PY" ] && die "profile_schema.py not found alongside run_profile.sh ($SCHEMA_PY)"
 
-# Define default cache directory
-HOST_CACHE_DIR="${HOST_CACHE_DIR:-$HOME/.cache/modeltainer}"
-echo "Using host cache dir: $HOST_CACHE_DIR"
+log "Validating profile: $PROFILE_SCRIPT"
 
-# Also support llama.cpp specific model file directly in host models directory
-LLAMACPP_MODELS_DIR="${LLAMACPP_MODELS_DIR:-$HOME/.cache/modeltainer_llamacpp}"
+SPEC_JSON=$("$PYTHON" "$SCHEMA_PY" --json "$PROFILE_SCRIPT") \
+  || die "Profile validation failed. Fix the errors above and retry."
 
-case "$ENGINE" in
-  vllm)
-    echo "Starting vLLM server with model: $MODEL on port $PORT"
-    mkdir -p "$HOST_CACHE_DIR"
-    
-    # Official vLLM Image: vllm/vllm-openai:latest
-    docker run --gpus all -d --rm \
-      -p "$PORT:$PORT" \
-      -v "$HOST_CACHE_DIR:/root/.cache/huggingface" \
-      --name "modeltainer-vllm-$PORT" \
-      vllm/vllm-openai:latest \
-      --model "$MODEL" --port "$PORT" ${VLLM_ARGS:-}
-    ;;
-    
-  sglang)
-    echo "Starting sglang server with model: $MODEL on port $PORT"
-    mkdir -p "$HOST_CACHE_DIR"
-    
-    # Official SGLang Image: lmsysorg/sglang:latest
-    docker run --gpus all -d --rm \
-      -p "$PORT:$PORT" \
-      -v "$HOST_CACHE_DIR:/root/.cache/huggingface" \
-      --name "modeltainer-sglang-$PORT" \
-      lmsysorg/sglang:latest \
-      python3 -m sglang.launch_server --model-path "$MODEL" --port "$PORT" --host 0.0.0.0 ${SGLANG_ARGS:-}
-    ;;
-    
-  llamacpp)
-    echo "Starting llama.cpp server with model: $MODEL on port $PORT"
-    mkdir -p "$LLAMACPP_MODELS_DIR"
-    
-    if [ -z "${MODEL_FILE:-}" ]; then
-      echo "Error: llama.cpp requires MODEL_FILE to be specified in the profile (e.g. model.gguf)"
-      exit 1
-    fi
-    
-    # Download using huggingface_hub on the host side first, or inside a side-car if host doesn't have it.
-    echo "Ensuring model file exists in local cache..."
-    if [ ! -f "$LLAMACPP_MODELS_DIR/$MODEL_FILE" ]; then
-        echo "Downloading $MODEL_FILE from $MODEL..."
-        docker run --rm \
-          -v "$LLAMACPP_MODELS_DIR:/models" \
-          python:3.10-slim \
-          bash -c "pip install huggingface_hub && huggingface-cli download $MODEL $MODEL_FILE --local-dir /models --local-dir-use-symlinks False"
+# ---------------------------------------------------------------------------
+# Parse spec fields from JSON using Python (no jq dependency)
+# ---------------------------------------------------------------------------
+_jq() {
+  "$PYTHON" -c "import json,sys; d=json.load(sys.stdin); print(d$1)" <<< "$SPEC_JSON"
+}
+
+CONTAINER_NAME=$(_jq "['container_name']")
+IMAGE=$(_jq "['image']")
+ENGINE=$(_jq "['engine']")
+HARDWARE=$(_jq "['hardware']")
+MODEL=$(_jq "['model']")
+PORT=$(_jq "['port']")
+CACHE_DIR=$(_jq "['cache_dir']")
+
+# Build docker run flags from the spec
+GPU_FLAGS=$("$PYTHON" -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+print(' '.join(d['gpu_flags']))
+" <<< "$SPEC_JSON")
+
+VOLUME_FLAGS=$("$PYTHON" -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+print(' '.join(f'-v {v}' for v in d['volumes']))
+" <<< "$SPEC_JSON")
+
+ENV_FLAGS=$("$PYTHON" -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+print(' '.join(f'-e {k}={v}' for k,v in d['env'].items()))
+" <<< "$SPEC_JSON")
+
+ENGINE_CMD=$("$PYTHON" -c "
+import json, sys, shlex
+d = json.loads(sys.stdin.read())
+print(' '.join(shlex.quote(a) for a in d['engine_cmd']))
+" <<< "$SPEC_JSON")
+
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
+log "========================================="
+log "  Engine   : $ENGINE"
+log "  Hardware : $HARDWARE"
+log "  Model    : $MODEL"
+log "  Port     : $PORT"
+log "  Image    : $IMAGE"
+log "  Cache    : $CACHE_DIR"
+log "========================================="
+
+# ---------------------------------------------------------------------------
+# Special pre-step for llama.cpp: ensure GGUF file is downloaded
+# ---------------------------------------------------------------------------
+if [ "$ENGINE" = "llamacpp" ]; then
+  MODEL_FILE=$(_jq "['model_file']")
+  LLAMACPP_MODELS_DIR=$(_jq "['llamacpp_models_dir']")
+  mkdir -p "$LLAMACPP_MODELS_DIR"
+
+  if [ ! -f "$LLAMACPP_MODELS_DIR/$MODEL_FILE" ]; then
+    log "Downloading '$MODEL_FILE' from '$MODEL'..."
+    if $DRY_RUN; then
+      log "[dry-run] Would download: $MODEL / $MODEL_FILE → $LLAMACPP_MODELS_DIR"
     else
-        echo "Model $MODEL_FILE already cached locally."
+      docker run --rm \
+        -v "$LLAMACPP_MODELS_DIR:/models" \
+        python:3.12-slim \
+        bash -c "pip install -q huggingface_hub && \
+                 huggingface-cli download '$MODEL' '$MODEL_FILE' \
+                   --local-dir /models --local-dir-use-symlinks False"
     fi
+  else
+    log "Model file already cached: $LLAMACPP_MODELS_DIR/$MODEL_FILE"
+  fi
+else
+  mkdir -p "$CACHE_DIR"
+fi
 
-    # Official LLaMA.cpp Engine Image: ghcr.io/ggerganov/llama.cpp:server
-    # It requires the model file explicitly (-m)
-    docker run -d --rm \
-      -p "$PORT:$PORT" \
-      -v "$LLAMACPP_MODELS_DIR:/models" \
-      --name "modeltainer-llamacpp-$PORT" \
-      ghcr.io/ggerganov/llama.cpp:server \
-      -m "/models/$MODEL_FILE" --port "$PORT" --host 0.0.0.0 ${LLAMACPP_ARGS:-}
-    ;;
-    
-  *)
-    echo "Unknown ENGINE: $ENGINE (Supported: vllm, sglang, llamacpp)"
-    exit 1
-    ;;
-esac
+# ---------------------------------------------------------------------------
+# Build the full docker run command
+# ---------------------------------------------------------------------------
+DOCKER_CMD="docker run -d --rm \
+  --name $CONTAINER_NAME \
+  -p $PORT:$PORT \
+  $GPU_FLAGS \
+  $VOLUME_FLAGS \
+  $ENV_FLAGS \
+  $IMAGE \
+  $ENGINE_CMD"
 
-echo "========================================="
-echo "Container start command initiated."
-echo "Use 'docker logs -f modeltainer-$ENGINE-$PORT' to view logs."
-echo "Use 'docker stop modeltainer-$ENGINE-$PORT' to stop the container."
-echo "========================================="
+# Clean up excess whitespace for readability
+DOCKER_CMD=$(echo "$DOCKER_CMD" | tr -s ' ')
+
+# ---------------------------------------------------------------------------
+# Execute (or print for --dry-run)
+# ---------------------------------------------------------------------------
+if $DRY_RUN; then
+  log "[dry-run] Docker command:"
+  echo ""
+  echo "  $DOCKER_CMD"
+  echo ""
+  log "[dry-run] No container was started."
+else
+  log "Starting container: $CONTAINER_NAME"
+  eval "$DOCKER_CMD"
+  log "========================================="
+  log "Container started successfully!"
+  log "  Logs : docker logs -f $CONTAINER_NAME"
+  log "  Stop : docker stop $CONTAINER_NAME"
+  log "========================================="
+fi

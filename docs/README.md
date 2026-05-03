@@ -3,6 +3,8 @@
 Guides for deploying and operating ModelTainer:
 
 - [Quickstart](quickstart.md)
+- [**Profile Reference**](profile-reference.md) ← Start here for profile YAML fields
+- [**DGX Spark Guide**](dgx-spark.md) ← Grace Blackwell / unified memory
 - [Security baseline](security.md)
 - [Model swap guide](model-swap.md)
 - [A/B testing](ab-testing.md)

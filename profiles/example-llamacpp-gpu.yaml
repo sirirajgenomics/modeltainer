@@ -1,0 +1,24 @@
+# =============================================================================
+# ModelTainer Profile — llama.cpp with Partial GPU Offload
+# =============================================================================
+# llama.cpp can offload a subset of model layers to the GPU while keeping
+# the remainder in system RAM. Useful for machines with limited VRAM.
+#
+# Launch:  bash scripts/run_profile.sh profiles/example-llamacpp-gpu.yaml
+# Dry-run: bash scripts/run_profile.sh --dry-run profiles/example-llamacpp-gpu.yaml
+# =============================================================================
+
+engine: llamacpp
+hardware: gpu
+model: unsloth/Qwen2.5-0.5B-Instruct-GGUF
+model_file: qwen2.5-0.5b-instruct-q4_k_m.gguf
+port: 8003
+
+model_params:
+  max_model_len: 4096
+  # Offload this many layers to GPU VRAM (0 = CPU only, -1 = all layers)
+  n_gpu_layers: 20
+  n_threads: 4
+  n_parallel: 2
+
+engine_args: []

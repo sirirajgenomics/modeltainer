@@ -1,0 +1,37 @@
+# =============================================================================
+# ModelTainer Profile — vLLM on NVIDIA DGX Spark
+# =============================================================================
+# NVIDIA DGX Spark: GB10 Grace Blackwell — ARM aarch64 + 128 GB unified memory.
+# Key differences from a standard GPU node:
+#   • --enforce-eager is injected automatically (avoids CUDA graph issues on
+#     Grace Blackwell in early driver versions)
+#   • gpu_memory_utilization can be set higher (unified memory, no separate VRAM)
+#   • Use dtype: auto — Blackwell hardware handles bfloat16 natively
+#
+# Recommended engines: vLLM (primary), SGLang.
+# llama.cpp is not needed on DGX Spark — unified memory makes it redundant.
+#
+# Launch:  bash scripts/run_profile.sh profiles/example-vllm-dgx-spark.yaml
+# Dry-run: bash scripts/run_profile.sh --dry-run profiles/example-vllm-dgx-spark.yaml
+# =============================================================================
+
+engine: vllm
+hardware: dgx_spark       # ← Selects DGX Spark image + injects --enforce-eager
+model: Qwen/Qwen2.5-7B-Instruct
+port: 8000
+
+model_params:
+  # DGX Spark has 128 GB unified memory — longer context is feasible
+  max_model_len: 32768
+  # Use most of unified memory for KV cache
+  gpu_memory_utilization: 0.92
+  dtype: auto              # Blackwell handles bfloat16 natively
+  trust_remote_code: true
+
+# Optional: pass additional vLLM flags not yet in model_params
+engine_args: []
+  # Example: enable speculative decoding
+  # - "--speculative-model"
+  # - "Qwen/Qwen2.5-0.5B-Instruct"
+  # - "--num-speculative-tokens"
+  # - "5"

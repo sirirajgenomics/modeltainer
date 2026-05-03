@@ -1,34 +1,97 @@
 # 🤖 ModelTainer AI Agent Guidelines
 
-Welcome, Agent! You are acting as an AI Engineer working on the **ModelTainer** repository. 
-When generating code, modifying configurations, or redesigning the architecture, please strictly adhere to the following core engineering principles:
+Welcome, Agent! You are working on the **ModelTainer** repository.
+Strictly adhere to the following engineering principles.
+
+---
 
 ## 1. Architectural Philosophy
-- **Component Isolation**: ModelTainer serves as a proxy/gateway. It separates the API routing layer (`compose.yaml` gateway) from the backend engine execution layer (`run_profile.sh`). Do not tightly couple them.
-- **No Custom Images for Engines**: ModelTainer strictly uses **official Docker images** for state-of-the-art LLM backends (e.g., `vllm/vllm-openai`, `lmsysorg/sglang`, `ghcr.io/ggerganov/llama.cpp:server`). **Do not write `Dockerfile`s or build custom images for these engines.**
-- **Delegated Execution via Custom Profiles**: The deployment logic for a specific model is abstracted into lightweight Bash scripts located in the `profiles/` directory (e.g., `profiles/example-vllm.sh`).
-- **Volume Mounted Caching**: Containers must never download models directly into their ephemeral storage. The central `run_profile.sh` script maps a local host directory (e.g., `~/.cache/modeltainer`) into the container to persist Hugging Face models between container restarts. 
 
-## 2. Coding Standards
-- **Bash Scripts (`scripts/`)**: 
-  - Always use `set -euo pipefail`.
-  - Prefer explicit variable exports and validate required inputs prior to execution.
-  - Implement comprehensive logging and error handling.
-- **Python Code (`api/`, `tests/`)**: 
-  - Adhere to **PEP8** standard conventions.
-  - Heavily use Python Type Hints.
-  - Assume an async-first context via `FastAPI`/`Starlette` for the API gateway.
-- **Docker/Compose**: 
-  - Keep `compose.yaml` configurations focused on the proxy/gateway and foundational services (Redis, etc).
-  - Use `docker run` inside bash profiles to dynamically handle hardware attachment (`--gpus all`) and caching.
+- **Component Isolation**: ModelTainer separates the API routing layer (`compose.yaml` gateway) from the backend engine execution layer (`scripts/run_profile.sh`). Do not tightly couple them.
+- **No Custom Images for Engines**: ModelTainer uses **official Docker images** for LLM backends (`vllm/vllm-openai`, `lmsysorg/sglang`, `ghcr.io/ggerganov/llama.cpp:server`). Never write `Dockerfile`s for these engines.
+- **Declarative YAML Profiles**: Every model deployment is a `.yaml` file in `profiles/`. All fields are Pydantic-validated by `scripts/profile_schema.py` before any Docker command runs.
+- **Volume-Mounted Caching**: Containers never download models into ephemeral storage. `run_profile.sh` maps a host directory (`~/.cache/modeltainer`) into the container.
+- **Hardware Tiers**: The `hardware:` field (`cpu` / `gpu` / `dgx_spark`) controls GPU flags, image selection, and engine-specific injections. Never hard-code `--gpus all` outside of this logic.
 
-## 3. Extending Engines
-When a user requests a new backend engine (e.g., `TensorRT-LLM`, `Ollama`, or `vLLM` forks):
-1. **Find the target Official Docker Image**.
-2. **Modify `scripts/run_profile.sh`**: Add a new `case "$ENGINE" in` block mapping the volume mounts and port forwarding appropriately.
-3. **Create an Example Profile**: Add an `example-<engine>.sh` to the `profiles/` directory demonstrating basic use.
+---
 
-## 4. Agentic Workflows
-- **Always Verify Model Instructions**: Before creating a running job or profile for a new model, you MUST always fetch and read the target model's Hugging Face `README.md` (Model Card). This ensures that you account for specific quantization details, prompt templates, context window constraints, or custom code requirements (`--trust-remote-code`) before attempting to start the engine.
+## 2. Profile System
 
-By maintaining this structure, we ensure ModelTainer remains agile, performant, and incredibly easy for end-users to adopt.
+### YAML Schema
+All profiles are validated by `scripts/profile_schema.py` via Pydantic v2.
+- **Add new `model_params` fields** in `ModelParams` with a docstring and the equivalent CLI flag.
+- **Add new hardware tiers** by extending the `HardwareTier` enum and updating `gpu_flags()`, `engine_image()`, and `build_engine_cmd()`.
+
+### Running & Validating
+```bash
+# Validate only (no Docker)
+bash scripts/validate_profile.sh profiles/my-model.yaml
+
+# Dry-run (print docker command)
+bash scripts/run_profile.sh --dry-run profiles/my-model.yaml
+
+# Launch
+bash scripts/run_profile.sh profiles/my-model.yaml
+```
+
+---
+
+## 3. Coding Standards
+
+### Bash (`scripts/`)
+- Always use `set -euo pipefail`.
+- Validate all inputs before executing.
+- Use `log()` / `err()` / `die()` helpers.
+- Never parse JSON with Bash string ops — use Python for JSON.
+
+### Python (`api/`, `scripts/`, `tests/`)
+- PEP 8 style with type hints everywhere.
+- Pydantic v2 for all data models (`model_config = {"extra": "forbid"}`).
+- Async-first via `FastAPI`/`httpx` for the API gateway.
+- No `requests` — use `httpx` only.
+
+### Docker/Compose
+- `compose.yaml` is for the gateway only. Engine containers are managed by `run_profile.sh`.
+- No deprecated `version:` key.
+- Always add `healthcheck:` and `restart: unless-stopped` to gateway services.
+
+---
+
+## 4. Extending Engines
+
+When a user requests a new engine (e.g. `TensorRT-LLM`, `Ollama`):
+
+1. **Find the official Docker image**.
+2. **Add the enum value** to `EngineType` in `scripts/profile_schema.py`.
+3. **Add an `engine_image()` branch** returning the correct image per hardware tier.
+4. **Add a `build_engine_cmd()` branch** mapping `model_params` fields to CLI flags.
+5. **Update `run_profile.sh`** if any special pre-steps are needed (e.g. GGUF download).
+6. **Create an example profile** in `profiles/example-<engine>-<tier>.yaml`.
+7. **Add tests** in `tests/test_profile_schema.py`.
+
+---
+
+## 5. Hardware Tiers
+
+| Tier | `hardware:` | GPU Flag | Notes |
+|------|-------------|----------|-------|
+| CPU-only | `cpu` | none | vLLM uses `--device cpu`; llamacpp uses CPU threads |
+| GPU | `gpu` | `--gpus all` | Standard NVIDIA/AMD workstation or server |
+| DGX Spark | `dgx_spark` | `--gpus all` | ARM aarch64 + 128 GB unified memory; vLLM gets `--enforce-eager` automatically |
+
+### DGX Spark Notes
+- The GB10 Grace Blackwell Superchip is ARM (aarch64). Official vLLM and SGLang images ship multi-arch manifests — Docker pulls the correct architecture automatically.
+- `--enforce-eager` is injected for vLLM on `dgx_spark` to bypass CUDA graph compilation on early Blackwell drivers. Do not remove this without testing.
+- Dual-unit (2× DGX Spark via ConnectX-7) for 405B models is **out of scope** for the current runtime; use `tensor_parallel_size` within a single unit.
+
+---
+
+## 6. Agentic Workflows
+
+- **Always fetch the model card** before creating a profile for a new model. Read the Hugging Face `README.md` to check for quantisation requirements, prompt templates, context window limits, and `--trust-remote-code` needs.
+- **Validate before committing**: run `bash scripts/validate_profile.sh profiles/*.yaml` and `pytest tests/` before any PR.
+- **Never commit secrets** — `config/secrets.env` and `.env` are git-ignored.
+
+---
+
+By maintaining this structure, ModelTainer remains agile, validated, and easy for users on any hardware tier to adopt.

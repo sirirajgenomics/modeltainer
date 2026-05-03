@@ -2,6 +2,7 @@ import os
 import json
 import time
 import logging
+from contextlib import asynccontextmanager
 from typing import Any, Dict
 from uuid import uuid4
 
@@ -9,7 +10,7 @@ import httpx
 from fastapi import FastAPI, HTTPException, Request, Depends, Header
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.exception_handlers import http_exception_handler as fastapi_http_exception_handler
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from .registry import ModelConfig, Registry
 
@@ -18,7 +19,20 @@ CONFIG_PATH = os.environ.get("MODELS_CONFIG", "config/models.yaml")
 logger = logging.getLogger("gateway")
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: startup + shutdown."""
+    load_config()
+    limits = httpx.Limits(max_connections=100, max_keepalive_connections=20)
+    transport = httpx.AsyncHTTPTransport(retries=3)
+    timeout = httpx.Timeout(10.0)
+    app.state.client = httpx.AsyncClient(timeout=timeout, limits=limits, transport=transport)
+    yield
+    await app.state.client.aclose()
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 def load_config() -> Dict[str, ModelConfig]:
@@ -35,40 +49,24 @@ async def custom_http_exception_handler(request: Request, exc: HTTPException):
     return await fastapi_http_exception_handler(request, exc)
 
 
-@app.on_event("startup")
-async def startup_event() -> None:
-    load_config()
-    limits = httpx.Limits(max_connections=100, max_keepalive_connections=20)
-    transport = httpx.AsyncHTTPTransport(retries=3)
-    timeout = httpx.Timeout(10.0)
-    app.state.client = httpx.AsyncClient(timeout=timeout, limits=limits, transport=transport)
-
-
-@app.on_event("shutdown")
-async def shutdown_event() -> None:
-    await app.state.client.aclose()
-
-
 class ChatMessage(BaseModel):
     role: str
     content: str
 
 
 class ChatCompletionRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     model: str
     messages: list[ChatMessage]
     stream: bool = False
 
-    class Config:
-        extra = "allow"
-
 
 class EmbeddingRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     model: str
     input: Any
-
-    class Config:
-        extra = "allow"
 
 
 def verify_api_key(authorization: str | None = Header(default=None)) -> None:

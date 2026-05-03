@@ -1,0 +1,21 @@
+# =============================================================================
+# ModelTainer Profile — SGLang on GPU
+# =============================================================================
+# SGLang is optimised for high throughput and structured generation.
+# Uses --gpus all automatically.
+#
+# Launch:  bash scripts/run_profile.sh profiles/example-sglang-gpu.yaml
+# Dry-run: bash scripts/run_profile.sh --dry-run profiles/example-sglang-gpu.yaml
+# =============================================================================
+
+engine: sglang
+hardware: gpu
+model: Qwen/Qwen2.5-0.5B-Instruct
+port: 8001
+
+model_params:
+  max_model_len: 4096
+  gpu_memory_utilization: 0.90
+  trust_remote_code: true    # Required for some Qwen variants
+
+engine_args: []

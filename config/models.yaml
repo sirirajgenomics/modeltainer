@@ -1,7 +1,18 @@
 models:
+  # GPU inference via vLLM — connects to a backend started via:
+  #   bash scripts/run_profile.sh profiles/example-vllm-gpu.yaml
   gpt-oss-20b-it:
     backend: vllm
     backend_url: "http://host.docker.internal:8000"
+
+  # High-throughput via SGLang — connects to a backend started via:
+  #   bash scripts/run_profile.sh profiles/example-sglang-gpu.yaml
+  gpt-oss-20b-sglang:
+    backend: sglang
+    backend_url: "http://host.docker.internal:8001"
+
+  # CPU inference via llama.cpp — connects to a backend started via:
+  #   bash scripts/run_profile.sh profiles/example-llamacpp-cpu.yaml
   gpt-oss-20b:
     backend: llamacpp
     backend_url: "http://host.docker.internal:8002"

@@ -20,6 +20,7 @@ class Backend(str, Enum):
     """Supported model backend implementations."""
 
     VLLM = "vllm"
+    SGLANG = "sglang"
     LLAMACPP = "llamacpp"
 
 
